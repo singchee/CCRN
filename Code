@@ -1,0 +1,80 @@
+require(tidyverse)
+require(tableone)
+require(officer)
+require(flextable)
+
+dataset <- df1 %>% 
+filter(AGE>=16 & !is.na(DIED_HOSP) & AdmEpisode<=1 & TREAT_LMT<=2) %>%
+mutate(group = as.numeric(Hmisc::cut2(qfte_permfte , g = 5)),
+ANZRODRiskOfDeath = ANZRODRiskOfDeath * 100,
+qfte_permfte = qfte_permfte * 100,
+qfte_posfte = qfte_posfte * 100,
+qfte_tot = qfte_tot * 100,
+qno_permfte = qno_permfte * 100,
+qno_tot = qno_tot * 100,
+avail_hosp = (AvailableBedsTotal / HospitalBeds) * 100,
+physical_hosp = (PhysicalBedsTotal / HospitalBeds) * 100,
+vent_hosp = (VentilatorBedsTotal / HospitalBeds) * 100,
+total_available = PermRNCCQualFTE  / AvailableBedsTotal,
+total_physical = PermRNCCQualFTE  / PhysicalBedsTotal,
+total_ventilator = PermRNCCQualFTE  / VentilatorBedsTotal) %>%
+group_by(SiteID) %>%
+mutate(number_admissions = n()) %>%
+ungroup()
+
+tofactor1 <- c()
+vars1 <- c("qfte_permfte","qfte_posfte","qfte_tot","qno_permfte","qno_tot","PermRNCCQualFTE","PermRNFTE","PermENPositionsFTE","TotalRN","PermRNCCQualNo","AvailableBedsTotal","HospitalBeds","PhysicalBedsTotal",
+"VentilatorBedsTotal","avail_hosp","physical_hosp","vent_hosp","total_available","total_physical","total_ventilator","RNResignedNo","RNResignedFTE")
+table_1 <- CreateTableOne(vars = vars1, factorVars = tofactor1, data = dataset)
+ext1 <- print(table_1, noSpaces = T, contDigits = 1, nonnormal = vars1, exact = tofactor1)
+table1f <- as.data.frame(ext1)
+table1f <- add_rownames(table1f)
+table_1 <- CreateTableOne(vars = vars1, factorVars = tofactor1, data = dataset, strata = "hospitalclassificationname")
+ext1 <- print(table_1, noSpaces = T, contDigits = 1, nonnormal = vars1, exact = tofactor1)
+table1ff <- as.data.frame(ext1[,c(1:4)])
+table1ff <- add_rownames(table1ff)
+table1f <- table1f %>%
+left_join(table1ff, by = "rowname")
+abc1 <- flextable(table1f)
+word_export <- read_docx()
+word_export <- body_add_flextable(word_export, abc1)
+print(word_export, 'Table 1.docx')
+
+#ME modelling
+data_model <- dataset %>%
+mutate(type_patient = case_when(ELECT_SURG==1 & AP3DIAG>=1200 ~ "elective",
+ELECT_SURG==0 & AP3DIAG>=1200 ~ "emergency",
+AP3DIAG<1200 ~ "medical", TRUE ~ NA_character_),
+type_patient = factor(type_patient, levels = c("elective", "emergency", "medical")),
+hospitalclassificationname = factor(hospitalclassificationname, levels = c("Tertiary", "Metropolitan", "Private", "Rural / Regional"))) %>%
+select(type_patient, hospitalclassificationname, ANZRODRiskOfDeath, INV_IND, DIED_HOSP, qno_tot, SiteID)
+
+mod = lmer(qno_tot ~ ANZRODRiskOfDeath + hospitalclassificationname + (1|SiteID), data=data_model)
+
+#plot
+
+p1 <- data_mort %>%
+    bind_rows(data_anzrod) %>%
+    mutate(final = factor(final, levels = c("alls_1","hospitalclassificationname_Tertiary","hospitalclassificationname_Metropolitan","hospitalclassificationname_Rural / Regional","hospitalclassificationname_Private",
+                                            "elect_surg_1","emerg_surg_1","medical_1")),
+           final = case_when(final=="alls_1" ~ "All Patients",
+                             final=="elect_surg_1" ~ "Elective surgical patients",
+                             final=="emerg_surg_1" ~ "Emergency surgical patients",
+                             final=="hospitalclassificationname_Metropolitan" ~ "Metropolitan",
+                             final=="hospitalclassificationname_Private" ~ "Private",
+                             final=="hospitalclassificationname_Rural / Regional" ~ "Rural / Regional",
+                             final=="hospitalclassificationname_Tertiary" ~ "Tertiary",
+                             final=="medical_1" ~ "Medical patients", TRUE ~ NA_character_)) %>%
+    ggplot(aes(x = factor(group), y = y, color = factor(variable), group = factor(variable))) +
+    geom_point(size = 2,  position = position_dodge(0.9)) +
+    geom_errorbar(aes(ymin = ymin, ymax = ymax), width = 0.5,  position = position_dodge(0.9), size = 0.8) +
+    xlab("%CCRN_No") +
+    ylab("Mean and 95% CI") +
+    facet_wrap(~ final, ncol = 4) +
+    scale_color_manual(values = c("black","red"), labels = c("ANZROD","Hospital Mortality"), name = "") +
+    scale_y_continuous(limits = c(0,20), breaks = seq(0,20,2), expand = c(0.02,0.02)) +
+    annotate("text", x = 1, y = 1, label = "No. of patients", size = 3, fontface = "bold") +
+    geom_text(aes(label = count, y = 0),  position=position_dodge(0.9), size = 3) +
+    scale_x_discrete(labels = c("< 45.1","45.1 - 55.6","55.6 - 63.8","63.8 - 76.2","> 76.2")) +
+    theme(panel.grid.major.y = element_line(colour = "gray"), panel.grid.minor.x = element_blank(), panel.background = element_blank(), axis.line = element_line(colour = "black"), legend.key=element_blank(), legend.text=element_text(size=20), axis.text=element_text(colour="black", size=13), axis.title=element_text(colour="black", size=17), legend.position = "bottom", legend.background=element_blank(), plot.title = element_text(hjust = 0.5, face="bold"), strip.background = element_rect(size = 0.5, fill = "white", color = "black", linetype = "solid"), strip.text = element_text(face = "bold", size = 18))
+
