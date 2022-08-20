@@ -42,12 +42,13 @@ print(word_export, 'Table 1.docx')
 
 #ME modelling
 data_model <- dataset %>%
-mutate(type_patient = case_when(ELECT_SURG==1 & AP3DIAG>=1200 ~ "elective",
-ELECT_SURG==0 & AP3DIAG>=1200 ~ "emergency",
-AP3DIAG<1200 ~ "medical", TRUE ~ NA_character_),
-type_patient = factor(type_patient, levels = c("elective", "emergency", "medical")),
-hospitalclassificationname = factor(hospitalclassificationname, levels = c("Tertiary", "Metropolitan", "Private", "Rural / Regional"))) %>%
-select(type_patient, hospitalclassificationname, ANZRODRiskOfDeath, INV_IND, DIED_HOSP, qno_tot, SiteID)
+    mutate(type_patient = case_when(ELECT_SURG==1 & AP3DIAG>=1200 ~ "elective",
+                                    ELECT_SURG==0 & AP3DIAG>=1200 ~ "emergency",
+                                    AP3DIAG<1200 ~ "medical", TRUE ~ NA_character_),
+           type_patient = factor(type_patient, levels = c("elective", "emergency", "medical")),
+           hospitalclassificationname = factor(hospitalclassificationname, levels = c("Tertiary", "Metropolitan", "Private", "Rural / Regional"))) %>%
+    select(type_patient, hospitalclassificationname, ANZRODRiskOfDeath, INV_IND, DIED_HOSP, qfte_permfte, SiteID)
+
 
 mod = lmer(qno_tot ~ ANZRODRiskOfDeath + hospitalclassificationname + (1|SiteID), data=data_model)
 
