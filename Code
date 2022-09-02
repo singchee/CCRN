@@ -49,6 +49,7 @@ data_model <- dataset %>%
            hospitalclassificationname = factor(hospitalclassificationname, levels = c("Tertiary", "Metropolitan", "Private", "Rural / Regional"))) %>%
     select(type_patient, hospitalclassificationname, ANZRODRiskOfDeath, INV_IND, DIED_HOSP, qfte_permfte, SiteID)
 
+groups = Hmisc::cut2(dataset$total_available, g = 5, onlycuts=TRUE)
 
 mod = lmer(qno_tot ~ ANZRODRiskOfDeath + hospitalclassificationname + (1|SiteID), data=data_model)
 
@@ -69,7 +70,7 @@ p1 <- data_mort %>%
     ggplot(aes(x = factor(group), y = y, color = factor(variable), group = factor(variable))) +
     geom_point(size = 2,  position = position_dodge(0.9)) +
     geom_errorbar(aes(ymin = ymin, ymax = ymax), width = 0.5,  position = position_dodge(0.9), size = 0.8) +
-    xlab("%CCRN_No") +
+    xlab("%CCRN FTE/Total RN FTE") +
     ylab("Mean and 95% CI") +
     facet_wrap(~ final, ncol = 4) +
     scale_color_manual(values = c("black","red"), labels = c("ANZROD","Hospital Mortality"), name = "") +
@@ -79,3 +80,28 @@ p1 <- data_mort %>%
     scale_x_discrete(labels = c("< 45.1","45.1 - 55.6","55.6 - 63.8","63.8 - 76.2","> 76.2")) +
     theme(panel.grid.major.y = element_line(colour = "gray"), panel.grid.minor.x = element_blank(), panel.background = element_blank(), axis.line = element_line(colour = "black"), legend.key=element_blank(), legend.text=element_text(size=20), axis.text=element_text(colour="black", size=13), axis.title=element_text(colour="black", size=17), legend.position = "bottom", legend.background=element_blank(), plot.title = element_text(hjust = 0.5, face="bold"), strip.background = element_rect(size = 0.5, fill = "white", color = "black", linetype = "solid"), strip.text = element_text(face = "bold", size = 18))
 
+#plot using CCRN FTE/ avialable beds
+p1 <- data_mort %>%
+    bind_rows(data_anzrod) %>%
+    mutate(final = factor(final, levels = c("alls_1","hospitalclassificationname_Tertiary","hospitalclassificationname_Metropolitan","hospitalclassificationname_Rural / Regional","hospitalclassificationname_Private",
+                                            "elect_surg_1","emerg_surg_1","medical_1")),
+           final = case_when(final=="alls_1" ~ "All Patients",
+                             final=="elect_surg_1" ~ "Elective surgical patients",
+                             final=="emerg_surg_1" ~ "Emergency surgical patients",
+                             final=="hospitalclassificationname_Metropolitan" ~ "Metropolitan",
+                             final=="hospitalclassificationname_Private" ~ "Private",
+                             final=="hospitalclassificationname_Rural / Regional" ~ "Rural / Regional",
+                             final=="hospitalclassificationname_Tertiary" ~ "Tertiary",
+                             final=="medical_1" ~ "Medical patients", TRUE ~ NA_character_)) %>%
+    ggplot(aes(x = factor(group), y = y, color = factor(variable), group = factor(variable))) +
+    geom_point(size = 2,  position = position_dodge(0.9)) +
+    geom_errorbar(aes(ymin = ymin, ymax = ymax), width = 0.5,  position = position_dodge(0.9), size = 0.8) +
+    xlab("CCRN FTE / Available ICU Beds") +
+    ylab("Mean and 95% CI") +
+    facet_wrap(~ final, ncol = 4) +
+    scale_color_manual(values = c("black","red"), labels = c("ANZROD","Hospital Mortality"), name = "") +
+    scale_y_continuous(limits = c(0,15), breaks = seq(0,20,2), expand = c(0.02,0.02)) +
+    annotate("text", x = 1, y = 1, label = "No. of patients", size = 3, fontface = "bold") +
+    geom_text(aes(label = count, y = 0),  position=position_dodge(0.9), size = 3) +
+    scale_x_discrete(labels = c("< 1.57","1.57 - 2.43","2.43 - 3.2","3.2 - 4.10","> 4.10")) +
+    theme(panel.grid.major.y = element_line(colour = "gray"), panel.grid.minor.x = element_blank(), panel.background = element_blank(), axis.line = element_line(colour = "black"), legend.key=element_blank(), legend.text=element_text(size=20), axis.text=element_text(colour="black", size=13), axis.title=element_text(colour="black", size=17), legend.position = "bottom", legend.background=element_blank(), plot.title = element_text(hjust = 0.5, face="bold"), strip.background = element_rect(size = 0.5, fill = "white", color = "black", linetype = "solid"), strip.text = element_text(face = "bold", size = 18))
