@@ -51,6 +51,9 @@ data_model <- dataset %>%
 
 groups = Hmisc::cut2(dataset$total_available, g = 5, onlycuts=TRUE)
 
+mod2 = glm(total_available ~ ANZRODRiskOfDeath + hospitalclassificationname, data=data_model)
+write.csv(coef(summary(mod2)), file="lm.csv")
+
 mod = lmer(qno_tot ~ ANZRODRiskOfDeath + hospitalclassificationname + (1|SiteID), data=data_model)
 
 #plot
