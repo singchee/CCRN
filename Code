@@ -47,16 +47,49 @@ data_model <- dataset %>%
                                     AP3DIAG<1200 ~ "medical", TRUE ~ NA_character_),
            type_patient = factor(type_patient, levels = c("elective", "emergency", "medical")),
            hospitalclassificationname = factor(hospitalclassificationname, levels = c("Tertiary", "Metropolitan", "Private", "Rural / Regional"))) %>%
-    select(type_patient, hospitalclassificationname, ANZRODRiskOfDeath, INV_IND, DIED_HOSP, qfte_permfte, SiteID)
+           select(type_patient, hospitalclassificationname, ANZRODRiskOfDeath, INV_IND, DIED_HOSP, qfte_permfte, SiteID, total_available)
 
 groups = Hmisc::cut2(dataset$total_available, g = 5, onlycuts=TRUE)
 
 mod2 = glm(total_available ~ ANZRODRiskOfDeath + hospitalclassificationname, data=data_model)
-write.csv(coef(summary(mod2)), file="lm.csv")
+
+write.csv(summary.glm(mod2NZ)$coefficients, file="glm_nz.csv")
 
 mod = lmer(qno_tot ~ ANZRODRiskOfDeath + hospitalclassificationname + (1|SiteID), data=data_model)
 
 #plot
+
+#get observed mortality by group
+data_mort <- dataset %>%
+	mutate(alls = 1, 
+		   elect_surg = ifelse(ELECT_SURG==1 & AP3DIAG>=1200, 1, NA),
+		   emerg_surg = ifelse(ELECT_SURG==0 & AP3DIAG>=1200, 1, NA),
+		   medical = ifelse(AP3DIAG<1200, 1, NA)) %>%
+	select(group, hospitalclassificationname, alls, elect_surg, emerg_surg, medical, DIED_HOSP) %>%
+	gather(key, value, hospitalclassificationname:medical) %>%
+	na.omit() %>%
+	mutate(final = paste(key, value, sep = "_")) %>%
+	group_by(group, final) %>%
+	summarise(mean_cl_normal(DIED_HOSP) * 100, count = sum(!is.na(DIED_HOSP))) %>%
+	ungroup() %>%
+	arrange(final, group) %>%
+	mutate(variable = "Hospital Mortality")	
+
+#get predicted mortality by group
+data_anzrod <- dataset %>%
+	mutate(alls = 1, 
+		   elect_surg = ifelse(ELECT_SURG==1 & AP3DIAG>=1200, 1, NA),
+		   emerg_surg = ifelse(ELECT_SURG==0 & AP3DIAG>=1200, 1, NA),
+		   medical = ifelse(AP3DIAG<1200, 1, NA)) %>%
+	select(group, hospitalclassificationname, alls, elect_surg, emerg_surg, medical, ANZRODRiskOfDeath) %>%
+	gather(key, value, hospitalclassificationname:medical) %>%
+	na.omit() %>%
+	mutate(final = paste(key, value, sep = "_")) %>%
+	group_by(group, final) %>%
+	summarise(mean_cl_normal(ANZRODRiskOfDeath), count = sum(!is.na(ANZRODRiskOfDeath))) %>%
+	ungroup() %>%
+	arrange(final, group) %>%
+	mutate(variable = "ANZROD")
 
 p1 <- data_mort %>%
     bind_rows(data_anzrod) %>%
